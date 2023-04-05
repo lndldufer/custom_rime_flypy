@@ -1,0 +1,6 @@
+var:
+  option:
+    ascii_mode: false
+  previously_selected_schema: flypy
+  schema_access_time:
+    flypy: 1528384719
