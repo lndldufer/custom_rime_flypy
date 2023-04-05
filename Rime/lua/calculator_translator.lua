@@ -241,6 +241,40 @@ nCr = function (n, r)
   return nPr(n,r) / fac(r)
 end
 
+function round(val, decimal)
+  local exp = decimal and 10^decimal or 1
+  return math.ceil(val * exp - 0.5) / exp
+end
+
+-- 年金现值函数
+pa = function(i, n)
+  local res = 0
+  local nn = 1
+  while (nn <= n)
+  do
+    res = res + 1/(1+i)^nn
+    nn = nn + 1
+  end
+  return round(res,4)
+end
+
+-- 年金终值函数
+fa = function(i,n)
+  local res = 0
+  local nn = n
+  while (nn>0)
+  do
+    nn = nn -1
+    res = res + (1+i)^(nn)
+  end
+  return round(res,4)
+end
+
+-- 现值
+pf = function(i,n)
+  return round(1/(1+i)^n,4)
+end
+
 MSE = function (t)
   local ss = 0
   local s = 0
@@ -363,7 +397,7 @@ local function serialize(obj)
 end
 
 -- greedy：隨時求值（每次變化都會求值，否則結尾爲特定字符時求值）
-local greedy = true
+local greedy = false
 
 local function calculator_translator(input, seg)
   if string.sub(input, 1, 1) ~= "=" then return end
@@ -377,6 +411,15 @@ local function calculator_translator(input, seg)
        
   if not expfin then return end
   
+  -- 替换部分符号和标点
+  exp = exp:gsub("%*", " * ")
+  exp = exp:gsub("%/", " / ")
+  exp = exp:gsub("%+", " + ")
+  exp = exp:gsub("%-", " - ")
+
+  exp = exp:gsub("%.%.",".")
+  exp = exp:gsub("%,%,",",")
+
   local expe = exp
   -- 鏈式調用語法糖
   expe = expe:gsub("%$", " chain ")
