@@ -241,7 +241,7 @@ nCr = function (n, r)
   return nPr(n,r) / fac(r)
 end
 
-function round(val, decimal)
+function round45(val, decimal)
   local exp = decimal and 10^decimal or 1
   return math.ceil(val * exp - 0.5) / exp
 end
@@ -255,7 +255,7 @@ pa = function(i, n)
     res = res + 1/(1+i)^nn
     nn = nn + 1
   end
-  return round(res,4)
+  return round45(res,4)
 end
 
 -- 年金终值函数
@@ -267,12 +267,12 @@ fa = function(i,n)
     nn = nn -1
     res = res + (1+i)^(nn)
   end
-  return round(res,4)
+  return round45(res,4)
 end
 
 -- 现值
 pf = function(i,n)
-  return round(1/(1+i)^n,4)
+  return round45(1/(1+i)^n,4)
 end
 
 MSE = function (t)
@@ -373,7 +373,7 @@ end
 local function serialize(obj)
   local type = type(obj)
   if type == "number" then
-    return isinteger(obj) and floor(obj) or obj
+    return isinteger(obj) and floor(obj) or round45(obj,4)
   elseif type == "boolean" then
     return tostring(obj)
   elseif type == "string" then
@@ -439,7 +439,7 @@ local function calculator_translator(input, seg)
   if result == nil then return end
   
   result = serialize(result)
-  yield(Candidate("number", seg.start, seg._end, exp.."="..result, ""))
+  yield(Candidate("number", seg.start, seg._end, exp.." = "..result, ""))
 end
 
 return calculator_translator
