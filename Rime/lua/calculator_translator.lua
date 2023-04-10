@@ -562,3 +562,5 @@ local function calculator_translator(input, seg)
     end
   end
 end
+
+return calculator_translator
