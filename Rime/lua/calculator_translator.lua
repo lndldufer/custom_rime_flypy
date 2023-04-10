@@ -399,47 +399,166 @@ end
 -- greedy：隨時求值（每次變化都會求值，否則結尾爲特定字符時求值）
 local greedy = false
 
+local function splitNumPart(str) 
+  local part = {}
+  part.int, part.dot, part.dec = string.match(str,"^(%d*)(%.?)(%d*)") 
+  return part 
+end 
+
+-- 确认精度问题
+local function GetPreciseDecimal(nNum, n)
+  if type(nNum) ~= "number" then nNum =tonumber(nNum) end 
+  n = n or 0;
+  n = math.floor(n)
+  if n < 0 then n = 0 end
+  local nDecimal = 10^n
+  local nTemp = math.floor(nNum * nDecimal);
+  local nRet = nTemp / nDecimal;
+  return nRet;
+end
+
+local function decimal_func(str, posMap, valMap) 
+  local dec
+  posMap = posMap or {[1]="角"; [2]="分"; [3]="厘"; [4]="毫"}
+  valMap = valMap or {[0]="零"; "壹"; "贰"; "叁"; "肆"; "伍"; "陆"; "柒"; "捌"; "玖"}
+  if #str>4 then dec = string.sub(tostring(str), 1, 4) else dec =tostring(str) end
+  dec = string.gsub(dec, "0+$", "")
+  if dec == "" then return "整" end
+  local result ="" 
+  for pos =1, #dec do
+      local val = tonumber(string.sub(dec, pos, pos))
+      if val~=0 then result = result .. valMap[val] .. posMap[pos] else result = result .. valMap[val] end
+  end
+  result=result:gsub(valMap[0]..valMap[0] ,valMap[0]) 
+  return result:gsub(valMap[0]..valMap[0] ,valMap[0])
+end
+
+-- 把数字串按千分位四位数分割，进行转换为中文
+local function formatNum(num,t)
+  local digitunit,wordFigure
+  local result=""
+  num=tostring(num)
+  if tonumber(t) < 1 then digitunit =	{"", "十", "百", "千"} else digitunit = {"", "拾", "佰", "仟"} end
+  if tonumber(t) <1 then
+      wordFigure = {"〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"}
+  else wordFigure = {"零"; "壹"; "贰"; "叁"; "肆"; "伍"; "陆"; "柒"; "捌"; "玖"} end
+  if string.len(num)>4 or tonumber(num)==0 then return wordFigure[1] end
+  local lens=string.len(num)
+  for i=1,lens do
+      local n=wordFigure[tonumber(string.sub(num,-i,-i))+1]
+      if n~=wordFigure[1] then result=n .. digitunit[i] .. result else result=n .. result end
+  end
+  result=result:gsub(wordFigure[1]..wordFigure[1] ,wordFigure[1])
+  result=result:gsub(wordFigure[1].."$","") result=result:gsub(wordFigure[1].."$","")
+  return result
+end
+
+-- 数值转换为中文
+function number2cnChar(num,flag,digitunit,wordFigure)	--flag=0 中文小写反之为大写
+  local st,result
+  num=tostring(num) result=""
+  local num1,num2=math.modf(num)
+  if tonumber(num2)==0 then
+      if tonumber(flag) < 1 then
+          digitunit = digitunit or {[1]="万"; [2]="亿"} wordFigure = wordFigure or {[1]="〇"; [2]="一"; [3]="十"; [4]="元"}
+      else
+          digitunit = digitunit or {[1]="万"; [2]="亿"} wordFigure = wordFigure or {[1]="零"; [2]="壹"; [3]="拾"; [4]="元"}
+      end
+      local lens=string.len(num1) 
+      if lens<5 then result=formatNum(num1,flag) elseif lens<9 then result=formatNum(string.sub(num1,1,-5),flag) .. digitunit[1].. formatNum(string.sub(num1,-4,-1),flag)
+      elseif lens<13 then result=formatNum(string.sub(num1,1,-9),flag) .. digitunit[2] .. formatNum(string.sub(num1,-8,-5),flag) .. digitunit[1] .. formatNum(string.sub(num1,-4,-1),flag) else result="" end
+      result=result:gsub("^" .. wordFigure[1],"") result=result:gsub(wordFigure[1] .. digitunit[1],"") result=result:gsub(wordFigure[1] .. digitunit[2],"")
+      result=result:gsub(wordFigure[1] .. wordFigure[1],wordFigure[1]) result=result:gsub(wordFigure[1] .. "$","")
+      if lens>4 then result=result:gsub("^"..wordFigure[2].. wordFigure[3],wordFigure[3]) end
+      if result~="" then result=result .. wordFigure[4] else result="数值超限！" end
+  else return "数值超限！" end
+  return result
+end
+
+local function number2zh(num,t)
+  local result,wordFigure
+  result=""
+  if tonumber(t)<1 then
+      wordFigure={"〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"}
+  else wordFigure={"零"; "壹"; "贰"; "叁"; "肆"; "伍"; "陆"; "柒"; "捌"; "玖"} end
+  if tostring(num)==nil then return "" end
+  for pos=1,string.len(num) do
+      result=result..wordFigure[tonumber(string.sub(num, pos, pos)+1)]
+  end
+  result=result:gsub(wordFigure[1] .. wordFigure[1], wordFigure[1])
+  return result:gsub(wordFigure[1] .. wordFigure[1], wordFigure[1])
+end
+
+function number_translatorFunc(num)
+  local numberPart=splitNumPart(num)
+  local result={}
+  if numberPart.dot~="" then
+      table.insert(result,{number2cnChar(numberPart.int,0,{"万","亿"},{"〇", "一", "十", "点"})..number2zh(numberPart.dec,0),""})
+      table.insert(result,{number2cnChar(numberPart.int,1,{"万","亿"},{"〇", "一", "十", "点"})..number2zh(numberPart.dec,1),""})
+      --table.insert(result,{number2cnChar(numberPart.int,0,{"萬","亿"},{"〇", "一", "十", "点"})..number2zh(numberPart.dec,1),""})
+      --table.insert(result,{number2cnChar(numberPart.int,0,{"萬","亿"},{"〇", "一", "十", "点"})..number2zh(numberPart.dec,1),"〔大写〕"})
+  else
+      table.insert(result,{number2cnChar(numberPart.int,0,{"万","亿"},{"〇", "一", "十", "点"}),""})
+      table.insert(result,{number2cnChar(numberPart.int,1,{"万","亿"},{"零", "壹", "拾", ""}),""})
+  end
+  table.insert(result,{number2cnChar(numberPart.int,0)..decimal_func(numberPart.dec,{[1]="角"; [2]="分"; [3]="厘"; [4]="毫"},{[0]="〇"; "一"; "二"; "三"; "四"; "五"; "六"; "七"; "八"; "九"}),""})
+  table.insert(result,{number2cnChar(numberPart.int,1)..decimal_func(numberPart.dec,{[1]="角"; [2]="分"; [3]="厘"; [4]="毫"},{[0]="零"; "壹"; "贰"; "叁"; "肄"; "伍"; "陆"; "柒"; "捌"; "玖"}),""})
+  return result
+end
+
 local function calculator_translator(input, seg)
   if string.sub(input, 1, 1) ~= "=" then return end
   
-  local expfin = greedy or string.sub(input, -1, -1) == ";"
-  local exp = (greedy or not expfin) and string.sub(input, 2, -1) or string.sub(input, 2, -2)
-  
-  -- 空格輸入可能
-  exp = exp:gsub("#", " ")
-  
-       
-  if not expfin then return end
-  
-  -- 替换部分符号和标点
-  exp = exp:gsub("%*", " * ")
-  exp = exp:gsub("%/", " / ")
-  exp = exp:gsub("%+", " + ")
-  exp = exp:gsub("%-", " - ")
+  if string.sub(input, 2, 2) == "c" then
 
-  exp = exp:gsub("%.%.",".")
-  exp = exp:gsub("%,%,",",")
+    local expfin = greedy or string.sub(input, -1, -1) == ";"
+    local exp = (greedy or not expfin) and string.sub(input, 3, -1) or string.sub(input, 3, -2)
+    if not expfin then return end
 
-  local expe = exp
-  -- 鏈式調用語法糖
-  expe = expe:gsub("%$", " chain ")
-  -- lambda語法糖
-  do
-    local count
-    repeat
-      expe, count = expe:gsub("\\%s*([%a%d%s,_]-)%s*%.(.-)|", " (function (%1) return %2 end) ")
-    until count == 0
+    -- 空格輸入可能
+    exp = exp:gsub("#", " ")
+  
+    -- 替换部分符号和标点
+    exp = exp:gsub("%*", " * ")
+    exp = exp:gsub("%/", " / ")
+    exp = exp:gsub("%+", " + ")
+    exp = exp:gsub("%-", " - ")
+
+    exp = exp:gsub("%.%.",".")
+    exp = exp:gsub("%,%,",",")
+
+    local expe = exp
+    -- 鏈式調用語法糖
+    expe = expe:gsub("%$", " chain ")
+    -- lambda語法糖
+    do
+      local count
+      repeat
+        expe, count = expe:gsub("\\%s*([%a%d%s,_]-)%s*%.(.-)|", " (function (%1) return %2 end) ")
+      until count == 0
+    end
+    --yield(Candidate("number", seg.start, seg._end, expe, "展開"))
+    
+    -- 防止危險操作，禁用os和io命名空間
+    if expe:find("i?os?%.") then return end
+    -- return語句保證了只有合法的Lua表達式才可執行
+    local result = load("return "..expe)()
+    if result == nil then return end
+    
+    result = serialize(result)
+    yield(Candidate("number", seg.start, seg._end, exp.." = "..result, ""))
+  
+  elseif string.sub(input, 2, 2) == "n" then
+
+    local expfin = false or string.sub(input, -1, -1) == ";"
+    local exp = (greedy or not expfin) and string.sub(input, 3, -1) or string.sub(input, 3, -2)
+    if not expfin then return end
+
+    numberPart=number_translatorFunc(exp:gsub("%.%.","."))
+    if #numberPart>0 then
+        for i=1, #numberPart do
+            yield(Candidate("string", seg.start, seg._end, numberPart[i][1],numberPart[i][2]))
+        end
+    end
   end
-  --yield(Candidate("number", seg.start, seg._end, expe, "展開"))
-  
-  -- 防止危險操作，禁用os和io命名空間
-  if expe:find("i?os?%.") then return end
-  -- return語句保證了只有合法的Lua表達式才可執行
-  local result = load("return "..expe)()
-  if result == nil then return end
-  
-  result = serialize(result)
-  yield(Candidate("number", seg.start, seg._end, exp.." = "..result, ""))
 end
-
-return calculator_translator
