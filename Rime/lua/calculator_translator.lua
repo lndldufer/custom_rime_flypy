@@ -508,12 +508,15 @@ end
 
 local function calculator_translator(input, seg)
   if string.sub(input, 1, 1) ~= "=" then return end
-  
-  if string.sub(input, 2, 2) == "c" then
 
-    local expfin = greedy or string.sub(input, -1, -1) == ";"
-    local exp = (greedy or not expfin) and string.sub(input, 3, -1) or string.sub(input, 3, -2)
-    if not expfin then return end
+  local expfin = greedy or string.sub(input, -1, -1) == ";"
+  if not expfin then return end
+  
+  if string.sub(input, -2, -2) == "c" then
+
+    --local expfin = greedy or string.sub(input, -1, -1) == ";"
+    local exp = (greedy or not expfin) and string.sub(input, 2, -1) or string.sub(input, 2, -3)
+    --if not expfin then return end
 
     -- 空格輸入可能
     exp = exp:gsub("#", " ")
@@ -548,11 +551,11 @@ local function calculator_translator(input, seg)
     result = serialize(result)
     yield(Candidate("number", seg.start, seg._end, exp.." = "..result, ""))
   
-  elseif string.sub(input, 2, 2) == "n" then
+  elseif string.sub(input, -2, -2) == "n" then
 
-    local expfin = false or string.sub(input, -1, -1) == ";"
-    local exp = (greedy or not expfin) and string.sub(input, 3, -1) or string.sub(input, 3, -2)
-    if not expfin then return end
+    --local expfin = false or string.sub(input, -1, -1) == ";"
+    local exp = (greedy or not expfin) and string.sub(input, 2, -1) or string.sub(input, 2, -3)
+    --if not expfin then return end
 
     numberPart=number_translatorFunc(exp:gsub("%.%.","."))
     if #numberPart>0 then
